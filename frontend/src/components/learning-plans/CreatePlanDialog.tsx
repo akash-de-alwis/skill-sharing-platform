@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { API_BASE_URL } from "@/config/api";
 
 const planSchema = z.object({
-  title: z.string().min(5, { message: "Title must be at least 5 characters" }).max(100, { message: "Title must not exceed 100 characters" }),
-  description: z.string().min(10, { message: "Description must be at least 10 characters" }).max(500, { message: "Description must not exceed 500 characters" }),
+  title: z.string().min(5, { message: "Title must be at least 5 characters" }).max(100),
+  description: z.string().min(10, { message: "Description must be at least 10 characters" }).max(500),
   duration: z.string().min(1, { message: "Duration must be specified" }),
   topics: z.array(z.string()).min(1, { message: "At least one topic must be added" }),
 });
@@ -27,7 +27,7 @@ interface CreatePlanDialogProps {
 }
 
 const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange }) => {
-  const [topicInput, setTopicInput] = React.useState("");
+  const [topicInput, setTopicInput] = useState("");
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(planSchema),
     defaultValues: {
@@ -38,14 +38,19 @@ const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange 
     },
   });
 
-  const onSubmit = (data: PlanFormValues) => {
-    // In a real app, this would make an API call to save the learning plan
-    console.log("Creating learning plan:", data);
-    
-    // Show success message
+  const onSubmit = async (data: PlanFormValues) => {
+    const planData = {
+      ...data,
+      author: { name: "Current User", avatar: "CU" }, // Replace with actual user data
+      followers: 0,
+    };
+
+    await fetch(`${API_BASE_URL}/learning-plans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(planData),
+    });
     toast.success("Learning plan created successfully!");
-    
-    // Reset form and close dialog
     form.reset();
     setTopicInput("");
     onOpenChange(false);
@@ -63,7 +68,7 @@ const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange 
 
   const removeTopic = (topic: string) => {
     const currentTopics = form.getValues("topics");
-    form.setValue("topics", currentTopics.filter(t => t !== topic));
+    form.setValue("topics", currentTopics.filter((t) => t !== topic));
   };
 
   const handleTopicKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

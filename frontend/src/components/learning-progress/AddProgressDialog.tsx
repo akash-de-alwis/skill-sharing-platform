@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
+import { API_BASE_URL } from "@/config/api";
 
 const progressSchema = z.object({
-  title: z.string().min(5, { message: "Title must be at least 5 characters" }).max(100, { message: "Title must not exceed 100 characters" }),
-  description: z.string().min(10, { message: "Description must be at least 10 characters" }).max(500, { message: "Description must not exceed 500 characters" }),
+  title: z.string().min(5, { message: "Title must be at least 5 characters" }).max(100),
+  description: z.string().min(10, { message: "Description must be at least 10 characters" }).max(500),
   milestone: z.string().min(3, { message: "Milestone must be specified" }),
   progressPercent: z.coerce.number().min(0).max(100),
   template: z.enum(["course", "project", "skill"]),
@@ -39,21 +39,24 @@ const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChang
     },
   });
 
-  const onSubmit = (data: ProgressFormValues) => {
-    // In a real app, this would make an API call to save the progress update
-    console.log("Adding progress update:", data);
-    
-    // Show success message
+  const onSubmit = async (data: ProgressFormValues) => {
+    const progressData = {
+      ...data,
+      author: { name: "Current User", avatar: "CU" }, // Replace with actual user data
+    };
+
+    await fetch(`${API_BASE_URL}/learning-progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(progressData),
+    });
     toast.success("Progress update added successfully!");
-    
-    // Reset form and close dialog
     form.reset();
     onOpenChange(false);
   };
 
   const selectedTemplate = form.watch("template");
 
-  // Pre-fill form based on selected template
   React.useEffect(() => {
     if (selectedTemplate === "course") {
       form.setValue("title", form.getValues("title") || "Completed Course: ");

@@ -1,67 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PageContainer from "@/components/ui/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar, ChevronUp, Plus, Target, Trophy } from "lucide-react";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 import AddProgressDialog from "@/components/learning-progress/AddProgressDialog";
+import { API_BASE_URL } from "@/config/api";
+import { fetchData } from "@/utils/api";
 
-const LearningProgress = () => {
+interface Author {
+  name: string;
+  avatar: string;
+}
+
+interface LearningProgress {
+  id: string;
+  title: string;
+  description: string;
+  progressPercent: number;
+  milestone: string;
+  author: Author;
+  createdAt: string;
+}
+
+const LearningProgress: React.FC = () => {
+  const [progressUpdates, setProgressUpdates] = useState<LearningProgress[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  
-  const progressUpdates = [
-    {
-      id: 1,
-      title: "Completed React Advanced Hooks Course",
-      description: "Finished all modules and exercises in the Advanced React Hooks course on Frontend Masters.",
-      progressPercent: 100,
-      milestone: "React Mastery",
-      author: {
-        name: "Alex Johnson",
-        avatar: "AJ",
-      },
-      createdAt: "2 hours ago",
-    },
-    {
-      id: 2,
-      title: "Spring Security Module Progress",
-      description: "Completed 4 out of 8 modules in the Spring Security course. Learning about authentication providers.",
-      progressPercent: 50,
-      milestone: "Spring Framework Expert",
-      author: {
-        name: "Jamie Park",
-        avatar: "JP",
-      },
-      createdAt: "1 day ago",
-    },
-    {
-      id: 3,
-      title: "UI Design Fundamentals",
-      description: "Started learning about color theory and typography for better UI design. Completed the first two chapters.",
-      progressPercent: 25,
-      milestone: "UI/UX Designer",
-      author: {
-        name: "Sam Taylor",
-        avatar: "ST",
-      },
-      createdAt: "2 days ago",
-    },
-    {
-      id: 4,
-      title: "Git Advanced Commands",
-      description: "Learned about rebasing, cherry-picking, and advanced Git workflows. Still need to practice more.",
-      progressPercent: 75,
-      milestone: "Version Control Master",
-      author: {
-        name: "Morgan Lee",
-        avatar: "ML",
-      },
-      createdAt: "3 days ago",
-    },
-  ];
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      const data = await fetchData(`${API_BASE_URL}/learning-progress`);
+      setProgressUpdates(data);
+    };
+    loadProgress();
+  }, []);
 
   return (
     <PageContainer 
@@ -94,7 +69,7 @@ const LearningProgress = () => {
                   </Avatar>
                   <div>
                     <p className="text-sm font-medium">{update.author.name}</p>
-                    <p className="text-xs text-muted-foreground">{update.createdAt}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(update.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex items-start justify-between">
@@ -127,7 +102,7 @@ const LearningProgress = () => {
               <CardFooter className="flex justify-between text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
-                  <span>Updated {update.createdAt}</span>
+                  <span>Updated {new Date(update.createdAt).toLocaleString()}</span>
                 </div>
                 <Button variant="ghost" size="sm">
                   <ChevronUp className="h-4 w-4 mr-1" /> Cheer

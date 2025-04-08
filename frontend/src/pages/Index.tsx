@@ -1,4 +1,3 @@
-
 import React from "react";
 import Hero from "@/components/home/Hero";
 import Features from "@/components/home/Features";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 
-const Index = () => {
+const Index: React.FC = () => {
   return (
     <>
       <Hero />

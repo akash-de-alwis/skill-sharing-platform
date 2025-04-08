@@ -1,71 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PageContainer from "@/components/ui/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarDays, Clock, Copy, Plus, Share2, Users } from "lucide-react";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 import CreatePlanDialog from "@/components/learning-plans/CreatePlanDialog";
+import { API_BASE_URL } from "@/config/api";
+import { fetchData } from "@/utils/api";
 
-const LearningPlans = () => {
+interface Author {
+  name: string;
+  avatar: string;
+}
+
+interface LearningPlan {
+  id: string;
+  title: string;
+  description: string;
+  author: Author;
+  topics: string[];
+  duration: string;
+  followers: number;
+  createdAt: string;
+}
+
+const LearningPlans: React.FC = () => {
+  const [plans, setPlans] = useState<LearningPlan[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  
-  const plans = [
-    {
-      id: 1,
-      title: "Full Stack React & Spring Boot Development",
-      description: "A comprehensive learning plan to master React frontend and Spring Boot backend development.",
-      author: {
-        name: "Alex Johnson",
-        avatar: "AJ",
-      },
-      topics: ["React", "Spring Boot", "REST API", "OAuth 2.0"],
-      duration: "8 weeks",
-      followers: 128,
-      createdAt: "2 days ago",
-    },
-    {
-      id: 2,
-      title: "UI/UX Design Fundamentals",
-      description: "Learn the fundamentals of UI/UX design, from wireframing to high-fidelity prototypes.",
-      author: {
-        name: "Sam Taylor",
-        avatar: "ST",
-      },
-      topics: ["Design", "Figma", "Typography", "Color Theory"],
-      duration: "6 weeks",
-      followers: 89,
-      createdAt: "1 week ago",
-    },
-    {
-      id: 3,
-      title: "Advanced Git & GitHub Workflow",
-      description: "Master advanced Git commands and efficient GitHub workflows for team collaboration.",
-      author: {
-        name: "Morgan Lee",
-        avatar: "ML",
-      },
-      topics: ["Git", "GitHub", "Branching", "CI/CD"],
-      duration: "3 weeks",
-      followers: 64,
-      createdAt: "2 weeks ago",
-    },
-    {
-      id: 4,
-      title: "Spring Security Deep Dive",
-      description: "Comprehensive learning plan for mastering Spring Security and OAuth 2.0 implementation.",
-      author: {
-        name: "Jamie Park",
-        avatar: "JP",
-      },
-      topics: ["Spring Security", "OAuth 2.0", "JWT", "Authentication"],
-      duration: "5 weeks",
-      followers: 73,
-      createdAt: "3 weeks ago",
-    },
-  ];
+
+  useEffect(() => {
+    const loadPlans = async () => {
+      const data = await fetchData(`${API_BASE_URL}/learning-plans`);
+      setPlans(data);
+    };
+    loadPlans();
+  }, []);
 
   return (
     <PageContainer 
@@ -98,7 +70,7 @@ const LearningPlans = () => {
                   </Avatar>
                   <div>
                     <p className="text-sm font-medium">{plan.author.name}</p>
-                    <p className="text-xs text-muted-foreground">{plan.createdAt}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(plan.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
                 <CardTitle>{plan.title}</CardTitle>

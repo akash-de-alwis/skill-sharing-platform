@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Menu, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const Header = () => {
+const Header: React.FC = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -50,7 +49,6 @@ const Header = () => {
           SkillSync<span className="text-primary">Lab</span>
         </Link>
 
-        {/* Desktop navigation */}
         {!isMobile && (
           <nav className="hidden md:flex items-center space-x-8">
             {menuItems.map((item) => (
@@ -78,7 +76,6 @@ const Header = () => {
             Sign Up
           </Button>
           
-          {/* Mobile menu button */}
           <Button
             variant="ghost"
             size="icon"
@@ -91,7 +88,6 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {isMobile && (
         <div
           className={cn(

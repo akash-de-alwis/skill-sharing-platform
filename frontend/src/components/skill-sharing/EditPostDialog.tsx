@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,13 +25,14 @@ const postSchema = z.object({
 
 type PostFormValues = z.infer<typeof postSchema>;
 
-interface CreatePostDialogProps {
+interface EditPostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPostCreated?: (newPost: any) => void;
+  post: any;
+  onPostUpdated: (updatedPost: any) => void;
 }
 
-const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange, onPostCreated }) => {
+const EditPostDialog: React.FC<EditPostDialogProps> = ({ open, onOpenChange, post, onPostUpdated }) => {
   const [tagInput, setTagInput] = useState("");
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -48,12 +49,30 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
     },
   });
 
+  useEffect(() => {
+    if (open && post) {
+      console.log("Post to edit:", post);
+      form.reset({
+        title: post.title || "",
+        description: post.description || "",
+        category: post.category || "",
+        tags: Array.isArray(post.tags) ? post.tags : [],
+        allowComments: post.allowComments ?? true,
+        visibility: post.visibility || "public",
+      });
+      setMediaPreview(post.image || null);
+      setMediaFile(null);
+    }
+  }, [open, post, form]);
+
   const onSubmit = async (data: PostFormValues) => {
     const formData = new FormData();
     const postData = {
       ...data,
-      likes: 0,
-      comments: 0,
+      author: post.author,
+      likes: post.likes,
+      comments: post.comments,
+      createdAt: post.createdAt,
     };
     formData.append("post", JSON.stringify(postData));
     if (mediaFile) {
@@ -61,26 +80,27 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/skill-posts`, {
-        method: "POST",
+      const response = await fetch(`${API_BASE_URL}/skill-posts/${post.id}`, {
+        method: "PUT",
         body: formData,
-        credentials: "include", // Include cookies for OAuth
+        credentials: "include",
       });
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to create post: ${response.status} ${errorText}`);
+        throw new Error(`Failed to update post: ${response.status} ${errorText}`);
       }
-      const newPost = await response.json();
-      toast.success("Post created successfully!");
+      const updatedPost = await response.json();
+      console.log("Updated Post from Backend:", updatedPost);
+      toast.success("Post updated successfully!");
       form.reset();
       setMediaPreview(null);
       setMediaFile(null);
       setTagInput("");
       onOpenChange(false);
-      if (onPostCreated) onPostCreated(newPost);
+      if (onPostUpdated) onPostUpdated(updatedPost);
     } catch (error) {
-      console.error("Error creating post:", error);
-      toast.error("Failed to create post. Please try again.");
+      console.error("Error updating post:", error);
+      toast.error("Failed to update post. Please try again.");
     }
   };
 
@@ -127,8 +147,8 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create New Post</DialogTitle>
-          <DialogDescription>Share your knowledge and skills with the community</DialogDescription>
+          <DialogTitle>Edit Post</DialogTitle>
+          <DialogDescription>Update your skill post details</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -140,7 +160,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
                   <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter a descriptive title for your post" {...field} />
+                      <Input placeholder="Enter a descriptive title" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -153,11 +173,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Describe what you want to share..."
-                        className="min-h-[120px]"
-                        {...field}
-                      />
+                      <Textarea placeholder="Describe your post..." className="min-h-[120px]" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -177,8 +193,8 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
                       >
                         {categories.map((category) => (
                           <div key={category} className="flex items-center space-x-2">
-                            <RadioGroupItem value={category} id={`category-${category}`} />
-                            <label htmlFor={`category-${category}`} className="text-sm cursor-pointer">
+                            <RadioGroupItem value={category} id={`edit-category-${category}`} />
+                            <label htmlFor={`edit-category-${category}`} className="text-sm cursor-pointer">
                               {category}
                             </label>
                           </div>
@@ -292,16 +308,16 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
                           className="flex flex-row items-center space-x-4"
                         >
                           <div className="flex items-center space-x-1">
-                            <RadioGroupItem value="public" id="visibility-public" />
-                            <label htmlFor="visibility-public" className="text-sm cursor-pointer">Public</label>
+                            <RadioGroupItem value="public" id="edit-visibility-public" />
+                            <label htmlFor="edit-visibility-public" className="text-sm cursor-pointer">Public</label>
                           </div>
                           <div className="flex items-center space-x-1">
-                            <RadioGroupItem value="followers" id="visibility-followers" />
-                            <label htmlFor="visibility-followers" className="text-sm cursor-pointer">Followers</label>
+                            <RadioGroupItem value="followers" id="edit-visibility-followers" />
+                            <label htmlFor="edit-visibility-followers" className="text-sm cursor-pointer">Followers</label>
                           </div>
                           <div className="flex items-center space-x-1">
-                            <RadioGroupItem value="private" id="visibility-private" />
-                            <label htmlFor="visibility-private" className="text-sm cursor-pointer">Private</label>
+                            <RadioGroupItem value="private" id="edit-visibility-private" />
+                            <label htmlFor="edit-visibility-private" className="text-sm cursor-pointer">Private</label>
                           </div>
                         </RadioGroup>
                       </FormControl>
@@ -314,7 +330,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create Post</Button>
+              <Button type="submit">Update Post</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -323,4 +339,4 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ open, onOpenChange,
   );
 };
 
-export default CreatePostDialog;
+export default EditPostDialog;
