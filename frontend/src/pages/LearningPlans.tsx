@@ -5,11 +5,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Clock, Copy, Plus, Share2, Users } from "lucide-react";
+import { CalendarDays, Clock, Copy, Plus, Share2, Users, Edit2, Trash2 } from "lucide-react";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 import CreatePlanDialog from "@/components/learning-plans/CreatePlanDialog";
+import EditPlanDialog from "@/components/learning-plans/EditPlanDialog";
 import { API_BASE_URL } from "@/config/api";
-import { fetchData } from "@/utils/api";
+import { toast } from "sonner";
+import axios from "axios";
 
 interface Author {
   name: string;
@@ -30,17 +32,66 @@ interface LearningPlan {
 const LearningPlans: React.FC = () => {
   const [plans, setPlans] = useState<LearningPlan[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<LearningPlan | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadPlans = async () => {
-      const data = await fetchData(`${API_BASE_URL}/learning-plans`);
-      setPlans(data);
+    const fetchPlans = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/learning-plans`, { withCredentials: true });
+        setPlans(response.data);
+      } catch (error) {
+        console.error("Failed to load plans:", error);
+        toast.error("Failed to load learning plans. Please try again.");
+      }
     };
-    loadPlans();
+
+    const fetchUser = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/skill-posts/auth/check`, { withCredentials: true });
+        if (response.status === 200) {
+          setUserName(response.data.name);
+        }
+      } catch (error) {
+        console.error("User not authenticated:", error);
+      }
+    };
+
+    fetchPlans();
+    fetchUser();
   }, []);
 
+  const handlePlanCreated = (newPlan: LearningPlan) => {
+    setPlans((prevPlans) => [...prevPlans, newPlan]);
+  };
+
+  const handlePlanUpdated = (updatedPlan: LearningPlan) => {
+    setPlans((prevPlans) =>
+      prevPlans.map((plan) => (plan.id === updatedPlan.id ? updatedPlan : plan))
+    );
+    setEditDialogOpen(false);
+    setSelectedPlan(null);
+  };
+
+  const handleDeletePlan = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this learning plan?")) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/learning-plans/${id}`, { withCredentials: true });
+      setPlans((prevPlans) => prevPlans.filter((plan) => plan.id !== id));
+      toast.success("Learning plan deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting plan:", error);
+      toast.error("Failed to delete learning plan. Please try again.");
+    }
+  };
+
+  const isPlanOwner = (plan: LearningPlan) => {
+    return plan.author.name === userName;
+  };
+
   return (
-    <PageContainer 
+    <PageContainer
       title="Learning Plans"
       description="Discover structured learning plans or create your own to guide your learning journey."
     >
@@ -65,12 +116,14 @@ const LearningPlans: React.FC = () => {
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <Avatar>
-                    <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${plan.author.avatar}`} />
-                    <AvatarFallback>{plan.author.avatar}</AvatarFallback>
+                    <AvatarImage src={plan.author.avatar} />
+                    <AvatarFallback>{plan.author.name[0]}</AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="text-sm font-medium">{plan.author.name}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(plan.createdAt).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(plan.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
                 <CardTitle>{plan.title}</CardTitle>
@@ -79,7 +132,9 @@ const LearningPlans: React.FC = () => {
               <CardContent>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {plan.topics.map((topic, i) => (
-                    <Badge key={i} variant="secondary">{topic}</Badge>
+                    <Badge key={i} variant="secondary">
+                      {topic}
+                    </Badge>
                   ))}
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -99,6 +154,27 @@ const LearningPlans: React.FC = () => {
                   Follow Plan
                 </Button>
                 <div className="flex gap-2">
+                  {isPlanOwner(plan) && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setSelectedPlan(plan);
+                          setEditDialogOpen(true);
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeletePlan(plan.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                   <Button variant="ghost" size="icon">
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -111,11 +187,20 @@ const LearningPlans: React.FC = () => {
           </AnimatedTransition>
         ))}
       </div>
-      
-      <CreatePlanDialog 
+
+      <CreatePlanDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+        onPlanCreated={handlePlanCreated}
       />
+      {selectedPlan && (
+        <EditPlanDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          plan={selectedPlan}
+          onPlanUpdated={handlePlanUpdated}
+        />
+      )}
     </PageContainer>
   );
 };

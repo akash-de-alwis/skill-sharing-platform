@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,13 +23,14 @@ const progressSchema = z.object({
 
 type ProgressFormValues = z.infer<typeof progressSchema>;
 
-interface AddProgressDialogProps {
+interface EditProgressDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onProgressCreated?: (newProgress: any) => void;
+  progress: any;
+  onProgressUpdated: (updatedProgress: any) => void;
 }
 
-const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChange, onProgressCreated }) => {
+const EditProgressDialog: React.FC<EditProgressDialogProps> = ({ open, onOpenChange, progress, onProgressUpdated }) => {
   const form = useForm<ProgressFormValues>({
     resolver: zodResolver(progressSchema),
     defaultValues: {
@@ -41,18 +42,30 @@ const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChang
     },
   });
 
+  useEffect(() => {
+    if (open && progress) {
+      form.reset({
+        title: progress.title || "",
+        description: progress.description || "",
+        milestone: progress.milestone || "",
+        progressPercent: progress.progressPercent || 0,
+        template: progress.template || "course",
+      });
+    }
+  }, [open, progress, form]);
+
   const onSubmit = async (data: ProgressFormValues) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/learning-progress`, data, {
+      const response = await axios.put(`${API_BASE_URL}/learning-progress/${progress.id}`, data, {
         withCredentials: true,
       });
-      toast.success("Progress update added successfully!");
+      toast.success("Progress update updated successfully!");
       form.reset();
       onOpenChange(false);
-      if (onProgressCreated) onProgressCreated(response.data);
+      onProgressUpdated(response.data);
     } catch (error) {
-      console.error("Error creating progress:", error);
-      toast.error("Failed to add progress update. Please try again.");
+      console.error("Error updating progress:", error);
+      toast.error("Failed to update progress update. Please try again.");
     }
   };
 
@@ -77,9 +90,9 @@ const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChang
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add Progress Update</DialogTitle>
+          <DialogTitle>Edit Progress Update</DialogTitle>
           <DialogDescription>
-            Share your learning progress with the community
+            Update your learning progress details
           </DialogDescription>
         </DialogHeader>
         
@@ -94,7 +107,7 @@ const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChang
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex gap-4"
                     >
                       <div className="flex items-center space-x-2">
@@ -184,7 +197,10 @@ const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChang
             />
             
             <DialogFooter>
-              <Button type="submit">Add Update</Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update Progress</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -193,4 +209,4 @@ const AddProgressDialog: React.FC<AddProgressDialogProps> = ({ open, onOpenChang
   );
 };
 
-export default AddProgressDialog;
+export default EditProgressDialog;

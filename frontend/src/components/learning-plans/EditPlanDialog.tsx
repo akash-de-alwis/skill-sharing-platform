@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,13 +22,14 @@ const planSchema = z.object({
 
 type PlanFormValues = z.infer<typeof planSchema>;
 
-interface CreatePlanDialogProps {
+interface EditPlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPlanCreated?: (newPlan: any) => void;
+  plan: any;
+  onPlanUpdated: (updatedPlan: any) => void;
 }
 
-const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange, onPlanCreated }) => {
+const EditPlanDialog: React.FC<EditPlanDialogProps> = ({ open, onOpenChange, plan, onPlanUpdated }) => {
   const [topicInput, setTopicInput] = useState("");
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(planSchema),
@@ -40,19 +41,30 @@ const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange,
     },
   });
 
+  useEffect(() => {
+    if (open && plan) {
+      form.reset({
+        title: plan.title || "",
+        description: plan.description || "",
+        duration: plan.duration || "",
+        topics: Array.isArray(plan.topics) ? plan.topics : [],
+      });
+    }
+  }, [open, plan, form]);
+
   const onSubmit = async (data: PlanFormValues) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/learning-plans`, data, {
+      const response = await axios.put(`${API_BASE_URL}/learning-plans/${plan.id}`, data, {
         withCredentials: true,
       });
-      toast.success("Learning plan created successfully!");
+      toast.success("Learning plan updated successfully!");
       form.reset();
       setTopicInput("");
       onOpenChange(false);
-      if (onPlanCreated) onPlanCreated(response.data);
+      onPlanUpdated(response.data);
     } catch (error) {
-      console.error("Error creating plan:", error);
-      toast.error("Failed to create learning plan. Please try again.");
+      console.error("Error updating plan:", error);
+      toast.error("Failed to update learning plan. Please try again.");
     }
   };
 
@@ -84,9 +96,9 @@ const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Create Learning Plan</DialogTitle>
+          <DialogTitle>Edit Learning Plan</DialogTitle>
           <DialogDescription>
-            Create a structured learning plan to share with others
+            Update the details of your learning plan
           </DialogDescription>
         </DialogHeader>
         
@@ -173,7 +185,10 @@ const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange,
             />
             
             <DialogFooter>
-              <Button type="submit">Create Plan</Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update Plan</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -182,4 +197,4 @@ const CreatePlanDialog: React.FC<CreatePlanDialogProps> = ({ open, onOpenChange,
   );
 };
 
-export default CreatePlanDialog;
+export default EditPlanDialog;
