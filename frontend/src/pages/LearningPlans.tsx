@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Clock, Copy, Plus, Share2, Users, Edit2, Trash2 } from "lucide-react";
+import { CalendarDays, Clock, Copy, Plus, Share2, Users, Edit2, Trash2, BookOpen, Target } from "lucide-react";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 import CreatePlanDialog from "@/components/learning-plans/CreatePlanDialog";
 import EditPlanDialog from "@/components/learning-plans/EditPlanDialog";
@@ -27,6 +27,10 @@ interface LearningPlan {
   duration: string;
   followers: number;
   createdAt: string;
+  goals: string[];
+  resources: string[];
+  difficulty: string;
+  prerequisites: string;
 }
 
 const LearningPlans: React.FC = () => {
@@ -130,21 +134,60 @@ const LearningPlans: React.FC = () => {
                 <CardDescription>{plan.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {plan.topics.map((topic, i) => (
-                    <Badge key={i} variant="secondary">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center text-muted-foreground">
-                    <Clock className="h-4 w-4 mr-1" />
-                    <span>{plan.duration}</span>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Target className="h-4 w-4" /> Difficulty: {plan.difficulty}
+                    </p>
                   </div>
-                  <div className="flex items-center text-muted-foreground">
-                    <Users className="h-4 w-4 mr-1" />
-                    <span>{plan.followers} followers</span>
+                  <div className="flex flex-wrap gap-2">
+                    {plan.topics.map((topic, i) => (
+                      <Badge key={i} variant="secondary">
+                        {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                  {plan.goals.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium">Goals:</p>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {plan.goals.map((goal, i) => (
+                          <li key={i}>{goal}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {plan.resources.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <BookOpen className="h-4 w-4" /> Resources:
+                      </p>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {plan.resources.map((resource, i) => (
+                          <li key={i}>
+                            <a href={resource} target="_blank" rel="noopener noreferrer" className="underline">
+                              {resource}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {plan.prerequisites && (
+                    <div>
+                      <p className="text-sm font-medium">Prerequisites:</p>
+                      <p className="text-sm text-muted-foreground">{plan.prerequisites}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center text-muted-foreground">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span>{plan.duration}</span>
+                    </div>
+                    <div className="flex items-center text-muted-foreground">
+                      <Users className="h-4 w-4 mr-1" />
+                      <span>{plan.followers} followers</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>

@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, ChevronUp, Plus, Target, Trophy, Edit2, Trash2 } from "lucide-react";
+import { Calendar, ChevronUp, Plus, Target, Trophy, Edit2, Trash2, Link2 } from "lucide-react";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 import AddProgressDialog from "@/components/learning-progress/AddProgressDialog";
 import EditProgressDialog from "@/components/learning-progress/EditProgressDialog";
 import { API_BASE_URL } from "@/config/api";
 import { toast } from "sonner";
 import axios from "axios";
+import { Badge } from "@/components/ui/badge";
 
 interface Author {
   name: string;
@@ -27,6 +28,10 @@ interface LearningProgress {
   author: Author;
   createdAt: string;
   template: string;
+  skillsGained: string[];
+  challengesFaced: string;
+  nextSteps: string;
+  evidenceLink: string;
 }
 
 const LearningProgress: React.FC = () => {
@@ -138,18 +143,62 @@ const LearningProgress: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">{update.progressPercent}%</span>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-medium">{update.progressPercent}%</span>
+                    </div>
+                    <Progress value={update.progressPercent} className="h-2" />
+                    {update.progressPercent === 100 && (
+                      <div className="mt-4 bg-green-50 text-green-700 py-2 px-4 rounded-md flex items-center gap-2">
+                        <Trophy className="h-4 w-4" />
+                        <span className="text-sm font-medium">Milestone completed!</span>
+                      </div>
+                    )}
                   </div>
-                  <Progress value={update.progressPercent} className="h-2" />
-                  {update.progressPercent === 100 && (
-                    <div className="mt-4 bg-green-50 text-green-700 py-2 px-4 rounded-md flex items-center gap-2">
-                      <Trophy className="h-4 w-4" />
-                      <span className="text-sm font-medium">Milestone completed!</span>
+                  {update.skillsGained.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium">Skills Gained:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {update.skillsGained.map((skill, i) => (
+                          <Badge key={i} variant="secondary">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
+                  {update.challengesFaced && (
+                    <div>
+                      <p className="text-sm font-medium">Challenges Faced:</p>
+                      <p className="text-sm text-muted-foreground">{update.challengesFaced}</p>
+                    </div>
+                  )}
+                  {update.nextSteps && (
+                    <div>
+                      <p className="text-sm font-medium">Next Steps:</p>
+                      <p className="text-sm text-muted-foreground">{update.nextSteps}</p>
+                    </div>
+                  )}
+                  {update.evidenceLink && (
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Link2 className="h-4 w-4" /> Evidence:
+                      </p>
+                      <a
+                        href={update.evidenceLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 underline"
+                      >
+                        {update.evidenceLink}
+                      </a>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Template: {update.template}</p>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="flex justify-between text-sm text-muted-foreground">

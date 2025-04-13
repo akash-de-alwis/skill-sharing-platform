@@ -4,8 +4,37 @@ import Features from "@/components/home/Features";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
+// Import team member photos (adjust paths as needed)
+import teamMember1 from "@/assets/images/team-member-1.jpg";
+import teamMember2 from "@/assets/images/team-member-2.jpg";
+import teamMember3 from "@/assets/images/team-member-4.jpg";
+import teamMember4 from "@/assets/images/team-member-3.jpg";
 
 const Index: React.FC = () => {
+  // Array of team member data
+  const teamMembers = [
+    {
+      name: "Akash De Alwis",
+      role: "Skill Sharing Posts",
+      photo: teamMember1,
+    },
+    {
+      name: "Madora Weerasinghe",
+      role: "Learning Progress Updates",
+      photo: teamMember2,
+    },
+    {
+      name: "Paman Yuthmika",
+      role: "Learning Plan Sharing",
+      photo: teamMember3,
+    },
+    {
+      name: "Amanda Vihangani",
+      role: "Interactivity, Profiles, Notifications",
+      photo: teamMember4,
+    },
+  ];
+
   return (
     <>
       <Hero />
@@ -54,18 +83,17 @@ const Index: React.FC = () => {
           </AnimatedTransition>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {Array.from({ length: 4 }).map((_, index) => (
+            {teamMembers.map((member, index) => (
               <AnimatedTransition key={index} direction="up" delay={0.1 + index * 0.05}>
                 <div className="bg-secondary/30 rounded-2xl p-6 text-center">
-                  <div className="w-24 h-24 bg-secondary rounded-full mx-auto mb-4"></div>
-                  <h3 className="font-medium text-lg">Team Member {index + 1}</h3>
+                  <img
+                    src={member.photo}
+                    alt={member.name}
+                    className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                  />
+                  <h3 className="font-medium text-lg">{member.name}</h3>
                   <p className="text-sm text-muted-foreground mb-3">Full-stack Contributor</p>
-                  <p className="text-sm text-muted-foreground">
-                    {index === 0 && "Skill Sharing Posts"}
-                    {index === 1 && "Learning Progress Updates"}
-                    {index === 2 && "Learning Plan Sharing"}
-                    {index === 3 && "Interactivity, Profiles, Notifications"}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{member.role}</p>
                 </div>
               </AnimatedTransition>
             ))}

@@ -1,16 +1,62 @@
 import React, { useState, useEffect } from "react";
-import PageContainer from "@/components/ui/PageContainer";
+import PageContainer from "@/components/ui/PageContainer"; // Ensure this file exists at src/components/ui/PageContainer.tsx
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { BookOpen, Edit, Github, Linkedin, Mail, MapPin, UserPlus, LogOut, Save } from "lucide-react";
+import {
+  BookOpen,
+  Edit,
+  Github,
+  Linkedin,
+  Mail,
+  MapPin,
+  UserPlus,
+  LogOut,
+  Save,
+  Heart,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  Edit2,
+  Trash2,
+  Send,
+} from "lucide-react";
 import AnimatedTransition from "@/components/ui/AnimatedTransition";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface Author {
+  name: string;
+  avatar: string;
+}
+
+interface Comment {
+  id: string;
+  content: string;
+  author: Author;
+  createdAt: string;
+}
+
+interface SkillPost {
+  id: string;
+  title: string;
+  description: string;
+  author: Author;
+  likedBy: string[];
+  createdAt: string;
+  image?: string;
+  category: string;
+  tags?: string[];
+  allowComments: boolean;
+  visibility: "public" | "followers" | "private";
+}
 
 interface UserProfile {
   name: string;
@@ -32,20 +78,26 @@ interface UserProfile {
 
 const Profile: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [posts, setPosts] = useState<SkillPost[]>([]);
+  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
   const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
+  const [userId, setUserId] = useState<string | null>(null);
+  const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
+  const [editingComment, setEditingComment] = useState<{ postId: string; commentId: string; content: string } | null>(null);
+  const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
+  const [showFullDescription, setShowFullDescription] = useState<{ [postId: string]: boolean }>({});
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         // Fetch authenticated user details
-        console.log("Fetching auth status from:", `${API_BASE_URL}/skill-posts/auth/check`);
         const authResponse = await axios.get(`${API_BASE_URL}/skill-posts/auth/check`, {
           withCredentials: true,
         });
-        console.log("Auth response:", authResponse.data);
 
         if (authResponse.data.status !== "Authenticated") {
           throw new Error("User not authenticated");
@@ -54,26 +106,24 @@ const Profile: React.FC = () => {
         const email = authResponse.data.email;
         const name = authResponse.data.name || "Unknown User";
         const avatar = authResponse.data.picture || name.substring(0, 2).toUpperCase();
-        console.log("Authenticated email:", email);
+        setUserId(authResponse.data.sub);
 
-        // Fetch additional profile data if available
-        console.log("Fetching profile from:", `${API_BASE_URL}/users/${email}`);
+        // Fetch additional profile data
         let profileData;
         try {
           const profileResponse = await axios.get(`${API_BASE_URL}/users/${email}`, {
             withCredentials: true,
           });
           profileData = profileResponse.data;
-          console.log("Profile response:", profileData);
         } catch (profileError: any) {
           console.warn("Profile not found in database, using auth data:", profileError.message);
-          profileData = null; // Use auth data if profile not found
+          profileData = null;
         }
 
         const profile: UserProfile = {
-          name: name,
-          avatar: avatar,
-          email: email,
+          name,
+          avatar,
+          email,
           title: profileData?.title || "",
           location: profileData?.location || "",
           bio: profileData?.bio || "",
@@ -89,6 +139,22 @@ const Profile: React.FC = () => {
         };
         setUserProfile(profile);
         setFormData(profile);
+
+        // Fetch user's posts
+        const postsResponse = await axios.get(`${API_BASE_URL}/skill-posts`, { withCredentials: true });
+        const userPosts = postsResponse.data.filter((post: SkillPost) => post.author.name === name);
+        setPosts(userPosts);
+
+        // Initialize comments and showComments
+        const initialShowComments: { [postId: string]: boolean } = {};
+        const initialShowFullDescription: { [postId: string]: boolean } = {};
+        for (const post of userPosts) {
+          fetchComments(post.id);
+          initialShowComments[post.id] = false;
+          initialShowFullDescription[post.id] = false;
+        }
+        setShowComments(initialShowComments);
+        setShowFullDescription(initialShowFullDescription);
       } catch (error: any) {
         console.error("Error fetching profile:", error.message);
         setErrorMessage("Failed to load profile. Please try logging in again.");
@@ -98,11 +164,21 @@ const Profile: React.FC = () => {
         }, 2000);
       } finally {
         setLoading(false);
+        setPostsLoading(false);
       }
     };
 
     fetchUserProfile();
   }, []);
+
+  const fetchComments = async (postId: string) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/comments/post/${postId}`, { withCredentials: true });
+      setComments((prev) => ({ ...prev, [postId]: response.data }));
+    } catch (error) {
+      console.error(`Failed to load comments for post ${postId}:`, error);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -126,13 +202,12 @@ const Profile: React.FC = () => {
   const handleSave = async () => {
     if (!userProfile?.email) return;
     try {
-      // Merge formData with existing userProfile to ensure name and avatar are included
       const updatedProfile = {
         ...userProfile,
         ...formData,
-        email: userProfile.email, // Ensure email is preserved
-        name: userProfile.name,   // Preserve Google name
-        avatar: userProfile.avatar // Preserve Google avatar
+        email: userProfile.email,
+        name: userProfile.name,
+        avatar: userProfile.avatar,
       };
       const response = await axios.put(`${API_BASE_URL}/users/${userProfile.email}`, updatedProfile, {
         withCredentials: true,
@@ -146,8 +221,105 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleToggleLike = async (postId: string) => {
+    if (!userId) {
+      toast.error("Please log in to like posts.");
+      return;
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/skill-posts/${postId}/like`, {}, { withCredentials: true });
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId ? { ...post, likedBy: response.data.likedBy } : post
+        )
+      );
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      toast.error("Failed to update like. Please try again.");
+    }
+  };
+
+  const handleAddComment = async (postId: string) => {
+    const content = commentInputs[postId]?.trim();
+    if (!content) {
+      toast.error("Comment cannot be empty.");
+      return;
+    }
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/comments/post/${postId}`,
+        { content },
+        { withCredentials: true }
+      );
+      setComments((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), response.data],
+      }));
+      setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
+      toast.success("Comment added!");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast.error("Failed to add comment. Please try again.");
+    }
+  };
+
+  const handleEditComment = async (postId: string, commentId: string) => {
+    if (!editingComment || !editingComment.content.trim()) {
+      toast.error("Comment cannot be empty.");
+      return;
+    }
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/comments/${commentId}`,
+        { content: editingComment.content },
+        { withCredentials: true }
+      );
+      setComments((prev) => ({
+        ...prev,
+        [postId]: prev[postId].map((c) => (c.id === commentId ? response.data : c)),
+      }));
+      setEditingComment(null);
+      toast.success("Comment updated!");
+    } catch (error) {
+      console.error("Error updating comment:", error);
+      toast.error("Failed to update comment. Please try again.");
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/comments/${commentId}`, { withCredentials: true });
+      setComments((prev) => ({
+        ...prev,
+        [postId]: prev[postId].filter((c) => c.id !== commentId),
+      }));
+      toast.success("Comment deleted!");
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast.error("Failed to delete comment. Please try again.");
+    }
+  };
+
+  const toggleComments = (postId: string) => {
+    setShowComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  };
+
+  const toggleDescription = (postId: string) => {
+    setShowFullDescription((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  };
+
   const handleLogout = () => {
     window.location.href = "http://localhost:8081/logout";
+  };
+
+  const isCommentOwner = (comment: Comment) => {
+    return comment.author.name === userProfile?.name;
+  };
+
+  const truncateDescription = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
   };
 
   if (loading) {
@@ -346,12 +518,223 @@ const Profile: React.FC = () => {
               </TabsList>
 
               <TabsContent value="posts" className="mt-6">
-                <div className="text-center py-10">
-                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="mt-4 text-lg font-medium">No posts yet</h3>
-                  <p className="text-muted-foreground mt-2">Start sharing your skills and knowledge.</p>
-                  <Button className="mt-4">Create Post</Button>
-                </div>
+                {postsLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(3)].map((_, index) => (
+                      <Skeleton key={index} className="h-48 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : posts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {posts.map((post, index) => (
+                      <AnimatedTransition key={post.id} direction="up" delay={0.05 * index}>
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={post.author.avatar} />
+                                <AvatarFallback>{post.author.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-semibold">{post.author.name}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <CardTitle className="text-lg line-clamp-2">{post.title}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 pt-0">
+                            {post.image && (
+                              <img
+                                src={post.image}
+                                alt={post.title}
+                                className="h-32 w-full object-cover rounded-md mb-2"
+                                onError={(e) => console.error("Image failed to load:", post.image)}
+                              />
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              {showFullDescription[post.id]
+                                ? post.description
+                                : truncateDescription(post.description, 100)}
+                              {post.description.length > 100 && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 h-auto text-xs"
+                                  onClick={() => toggleDescription(post.id)}
+                                >
+                                  {showFullDescription[post.id] ? "Show Less" : "Read More"}
+                                </Button>
+                              )}
+                            </p>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              <Badge variant="secondary" className="text-xs">{post.category}</Badge>
+                              {post.tags && post.tags.slice(0, 3).map((tag, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">{tag}</Badge>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleToggleLike(post.id)}
+                                      className={`p-1 ${userId && post.likedBy.includes(userId) ? "text-red-500" : ""}`}
+                                    >
+                                      <Heart
+                                        className={`h-4 w-4 ${userId && post.likedBy.includes(userId) ? "fill-red-500" : ""}`}
+                                      />
+                                      <span className="ml-1 text-xs">{post.likedBy.length}</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Like</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => toggleComments(post.id)}
+                                      className="p-1"
+                                    >
+                                      <MessageSquare className="h-4 w-4" />
+                                      <span className="ml-1 text-xs">{(comments[post.id] || []).length}</span>
+                                      {showComments[post.id] ? (
+                                        <ChevronUp className="h-3 w-3 ml-1" />
+                                      ) : (
+                                        <ChevronDown className="h-3 w-3 ml-1" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Comments</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            {showComments[post.id] && (
+                              <div className="mt-3 border-t pt-3 transition-all duration-300">
+                                {post.allowComments && (
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Input
+                                      placeholder="Add a comment..."
+                                      value={commentInputs[post.id] || ""}
+                                      onChange={(e) =>
+                                        setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          handleAddComment(post.id);
+                                        }
+                                      }}
+                                      className="text-sm"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleAddComment(post.id)}
+                                      disabled={!commentInputs[post.id]?.trim()}
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                                <div className="space-y-3 max-h-[150px] overflow-y-auto">
+                                  {(comments[post.id] || []).length > 0 ? (
+                                    (comments[post.id] || []).map((comment) => (
+                                      <div key={comment.id} className="flex items-start gap-2">
+                                        <Avatar className="h-6 w-6">
+                                          <AvatarImage src={comment.author.avatar} />
+                                          <AvatarFallback>{comment.author.name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <div className="flex items-center justify-between">
+                                            <p className="text-xs font-medium">{comment.author.name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                          </div>
+                                          {editingComment?.postId === post.id && editingComment?.commentId === comment.id ? (
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <Input
+                                                value={editingComment.content}
+                                                onChange={(e) =>
+                                                  setEditingComment({
+                                                    ...editingComment,
+                                                    content: e.target.value,
+                                                  })
+                                                }
+                                                onKeyDown={(e) => {
+                                                  if (e.key === "Enter") {
+                                                    handleEditComment(post.id, comment.id);
+                                                  }
+                                                }}
+                                                className="text-sm"
+                                              />
+                                              <Button
+                                                size="sm"
+                                                onClick={() => handleEditComment(post.id, comment.id)}
+                                                disabled={!editingComment.content.trim()}
+                                              >
+                                                Save
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setEditingComment(null)}
+                                              >
+                                                Cancel
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <p className="text-sm">{comment.content}</p>
+                                          )}
+                                          {isCommentOwner(comment) && !editingComment && (
+                                            <div className="flex gap-1 mt-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  setEditingComment({
+                                                    postId: post.id,
+                                                    commentId: comment.id,
+                                                    content: comment.content,
+                                                  })
+                                                }
+                                                className="p-1"
+                                              >
+                                                <Edit2 className="h-3 w-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDeleteComment(post.id, comment.id)}
+                                                className="p-1"
+                                              >
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No comments yet.</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </AnimatedTransition>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10">
+                    <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mt-4 text-lg font-medium">No posts yet</h3>
+                    <p className="text-muted-foreground mt-2">Start sharing your skills and knowledge.</p>
+                    <Button className="mt-4">Create Post</Button>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="progress">
