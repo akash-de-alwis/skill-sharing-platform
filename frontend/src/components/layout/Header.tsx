@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User } from "lucide-react";
+import { Menu, X, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
+import { toast } from "sonner";
 
 const Header: React.FC = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,6 +27,43 @@ const Header: React.FC = () => {
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/skill-posts/auth/check`, {
+          withCredentials: true,
+        });
+        setIsAuthenticated(response.data.status === "Authenticated");
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuthStatus();
+  }, []);
+
+  const handleLogin = () => {
+    window.location.href = "http://localhost:8081/oauth2/authorization/google";
+  };
+
+  const handleSignup = () => {
+    // Assuming signup uses the same OAuth flow, redirect to Google OAuth
+    window.location.href = "http://localhost:8081/oauth2/authorization/google";
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.post("http://localhost:8081/logout", {}, { withCredentials: true });
+      setIsAuthenticated(false);
+      toast.success("Logged out successfully!");
+      window.location.href = "/"; // Redirect to home after logout
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error("Failed to log out. Please try again.");
+    }
+  };
 
   const menuItems = [
     { title: "Home", path: "/" },
@@ -69,13 +110,48 @@ const Header: React.FC = () => {
         )}
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden md:flex">
-            Log In
-          </Button>
-          <Button size="sm" className="hidden md:flex">
-            Sign Up
-          </Button>
-          
+          {!isMobile && (
+            <>
+              {isAuthenticated ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log Out
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                  >
+                    <Link to="/profile">
+                      <User className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogin}
+                  >
+                    Log In
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSignup}
+                  >
+                    Sign Up
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
@@ -112,12 +188,48 @@ const Header: React.FC = () => {
             ))}
           </nav>
           <div className="mt-auto flex flex-col gap-3">
-            <Button variant="outline" size="lg" className="w-full">
-              Log In
-            </Button>
-            <Button size="lg" className="w-full">
-              Sign Up
-            </Button>
+            {isAuthenticated ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log Out
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  asChild
+                >
+                  <Link to="/profile">
+                    <User className="h-4 w-4 mr-2" />
+                    Profile
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleLogin}
+                >
+                  Log In
+                </Button>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={handleSignup}
+                >
+                  Sign Up
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import PageContainer from "@/components/ui/PageContainer"; // Ensure this file exists at src/components/ui/PageContainer.tsx
+import PageContainer from "@/components/ui/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +58,36 @@ interface SkillPost {
   visibility: "public" | "followers" | "private";
 }
 
+interface LearningPlan {
+  id: string;
+  title: string;
+  description: string;
+  author: Author;
+  topics: string[];
+  duration: string;
+  followers: number;
+  createdAt: string;
+  goals: string[];
+  resources: string[];
+  difficulty: string;
+  prerequisites: string;
+}
+
+interface LearningProgress {
+  id: string;
+  title: string;
+  description: string;
+  progressPercent: number;
+  milestone: string;
+  author: Author;
+  createdAt: string;
+  template: string;
+  skillsGained: string[];
+  challengesFaced: string;
+  nextSteps: string;
+  evidenceLink: string;
+}
+
 interface UserProfile {
   name: string;
   avatar: string;
@@ -79,9 +109,15 @@ interface UserProfile {
 const Profile: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<SkillPost[]>([]);
+  const [learningPlans, setLearningPlans] = useState<LearningPlan[]>([]);
+  const [learningProgress, setLearningProgress] = useState<LearningProgress[]>([]);
+  const [likedPosts, setLikedPosts] = useState<SkillPost[]>([]);
   const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(true);
+  const [likedLoading, setLikedLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
@@ -145,10 +181,25 @@ const Profile: React.FC = () => {
         const userPosts = postsResponse.data.filter((post: SkillPost) => post.author.name === name);
         setPosts(userPosts);
 
+        // Fetch user's learning plans
+        const plansResponse = await axios.get(`${API_BASE_URL}/learning-plans`, { withCredentials: true });
+        const userPlans = plansResponse.data.filter((plan: LearningPlan) => plan.author.name === name);
+        setLearningPlans(userPlans);
+
+        // Fetch user's learning progress
+        const progressResponse = await axios.get(`${API_BASE_URL}/learning-progress`, { withCredentials: true });
+        const userProgress = progressResponse.data.filter((progress: LearningProgress) => progress.author.name === name);
+        setLearningProgress(userProgress);
+
+        // Fetch liked posts
+        const likedPostsResponse = await axios.get(`${API_BASE_URL}/skill-posts`, { withCredentials: true });
+        const userLikedPosts = likedPostsResponse.data.filter((post: SkillPost) => post.likedBy.includes(authResponse.data.sub));
+        setLikedPosts(userLikedPosts);
+
         // Initialize comments and showComments
         const initialShowComments: { [postId: string]: boolean } = {};
         const initialShowFullDescription: { [postId: string]: boolean } = {};
-        for (const post of userPosts) {
+        for (const post of [...userPosts, ...userLikedPosts]) {
           fetchComments(post.id);
           initialShowComments[post.id] = false;
           initialShowFullDescription[post.id] = false;
@@ -165,6 +216,9 @@ const Profile: React.FC = () => {
       } finally {
         setLoading(false);
         setPostsLoading(false);
+        setPlansLoading(false);
+        setProgressLoading(false);
+        setLikedLoading(false);
       }
     };
 
@@ -233,6 +287,11 @@ const Profile: React.FC = () => {
           post.id === postId ? { ...post, likedBy: response.data.likedBy } : post
         )
       );
+      setLikedPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId ? { ...post, likedBy: response.data.likedBy } : post
+        )
+      );
     } catch (error) {
       console.error("Error toggling like:", error);
       toast.error("Failed to update like. Please try again.");
@@ -280,9 +339,13 @@ const Profile: React.FC = () => {
       }));
       setEditingComment(null);
       toast.success("Comment updated!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating comment:", error);
-      toast.error("Failed to update comment. Please try again.");
+      if (error.response?.status === 403) {
+        toast.error("You are not authorized to edit this comment.");
+      } else {
+        toast.error("Failed to update comment. Please try again.");
+      }
     }
   };
 
@@ -295,9 +358,13 @@ const Profile: React.FC = () => {
         [postId]: prev[postId].filter((c) => c.id !== commentId),
       }));
       toast.success("Comment deleted!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting comment:", error);
-      toast.error("Failed to delete comment. Please try again.");
+      if (error.response?.status === 403) {
+        toast.error("You are not authorized to delete this comment.");
+      } else {
+        toast.error("Failed to delete comment. Please try again.");
+      }
     }
   };
 
@@ -517,6 +584,7 @@ const Profile: React.FC = () => {
                 <TabsTrigger value="liked" className="flex-1">Liked</TabsTrigger>
               </TabsList>
 
+              {/* Posts Tab */}
               <TabsContent value="posts" className="mt-6">
                 {postsLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -737,30 +805,337 @@ const Profile: React.FC = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="progress">
-                <div className="text-center py-10">
-                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="mt-4 text-lg font-medium">No progress updates yet</h3>
-                  <p className="text-muted-foreground mt-2">Start tracking your learning journey.</p>
-                  <Button className="mt-4">Add Progress Update</Button>
-                </div>
+              {/* Progress Tab */}
+              <TabsContent value="progress" className="mt-6">
+                {progressLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(3)].map((_, index) => (
+                      <Skeleton key={index} className="h-48 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : learningProgress.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {learningProgress.map((progress, index) => (
+                      <AnimatedTransition key={progress.id} direction="up" delay={0.05 * index}>
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={progress.author.avatar} />
+                                <AvatarFallback>{progress.author.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-semibold">{progress.author.name}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(progress.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <CardTitle className="text-lg line-clamp-2">{progress.title}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 pt-0">
+                            <p className="text-sm text-muted-foreground">{truncateDescription(progress.description, 100)}</p>
+                            <div className="mt-2">
+                              <p className="text-xs font-medium">Progress: {progress.progressPercent}%</p>
+                              <div className="w-full bg-secondary h-1 rounded-full mt-1">
+                                <div
+                                  className="bg-primary h-1 rounded-full"
+                                  style={{ width: `${progress.progressPercent}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                            {progress.milestone && (
+                              <p className="text-xs mt-2">Milestone: {progress.milestone}</p>
+                            )}
+                            {progress.skillsGained.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {progress.skillsGained.slice(0, 3).map((skill, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </AnimatedTransition>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10">
+                    <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mt-4 text-lg font-medium">No progress updates yet</h3>
+                    <p className="text-muted-foreground mt-2">Start tracking your learning journey.</p>
+                    <Button className="mt-4">Add Progress Update</Button>
+                  </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="plans">
-                <div className="text-center py-10">
-                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="mt-4 text-lg font-medium">No learning plans yet</h3>
-                  <p className="text-muted-foreground mt-2">Create a structured learning plan.</p>
-                  <Button className="mt-4">Create Learning Plan</Button>
-                </div>
+              {/* Plans Tab */}
+              <TabsContent value="plans" className="mt-6">
+                {plansLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(3)].map((_, index) => (
+                      <Skeleton key={index} className="h-48 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : learningPlans.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {learningPlans.map((plan, index) => (
+                      <AnimatedTransition key={plan.id} direction="up" delay={0.05 * index}>
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={plan.author.avatar} />
+                                <AvatarFallback>{plan.author.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-semibold">{plan.author.name}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(plan.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <CardTitle className="text-lg line-clamp-2">{plan.title}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 pt-0">
+                            <p className="text-sm text-muted-foreground">{truncateDescription(plan.description, 100)}</p>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {plan.topics.slice(0, 3).map((topic, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">{topic}</Badge>
+                              ))}
+                            </div>
+                            <p className="text-xs mt-2">Difficulty: {plan.difficulty}</p>
+                            <p className="text-xs">Duration: {plan.duration}</p>
+                            <p className="text-xs">Followers: {plan.followers}</p>
+                          </CardContent>
+                        </Card>
+                      </AnimatedTransition>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10">
+                    <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mt-4 text-lg font-medium">No learning plans yet</h3>
+                    <p className="text-muted-foreground mt-2">Create a structured learning plan.</p>
+                    <Button className="mt-4">Create Learning Plan</Button>
+                  </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="liked">
-                <div className="text-center py-10">
-                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="mt-4 text-lg font-medium">No liked content yet</h3>
-                  <p className="text-muted-foreground mt-2">Like posts and plans to see them here.</p>
-                </div>
+              {/* Liked Tab */}
+              <TabsContent value="liked" className="mt-6">
+                {likedLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(3)].map((_, index) => (
+                      <Skeleton key={index} className="h-48 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : likedPosts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {likedPosts.map((post, index) => (
+                      <AnimatedTransition key={post.id} direction="up" delay={0.05 * index}>
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={post.author.avatar} />
+                                <AvatarFallback>{post.author.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-semibold">{post.author.name}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <CardTitle className="text-lg line-clamp-2">{post.title}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 pt-0">
+                            {post.image && (
+                              <img
+                                src={post.image}
+                                alt={post.title}
+                                className="h-32 w-full object-cover rounded-md mb-2"
+                                onError={(e) => console.error("Image failed to load:", post.image)}
+                              />
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              {showFullDescription[post.id]
+                                ? post.description
+                                : truncateDescription(post.description, 100)}
+                              {post.description.length > 100 && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 h-auto text-xs"
+                                  onClick={() => toggleDescription(post.id)}
+                                >
+                                  {showFullDescription[post.id] ? "Show Less" : "Read More"}
+                                </Button>
+                              )}
+                            </p>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              <Badge variant="secondary" className="text-xs">{post.category}</Badge>
+                              {post.tags && post.tags.slice(0, 3).map((tag, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">{tag}</Badge>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleToggleLike(post.id)}
+                                      className={`p-1 ${userId && post.likedBy.includes(userId) ? "text-red-500" : ""}`}
+                                    >
+                                      <Heart
+                                        className={`h-4 w-4 ${userId && post.likedBy.includes(userId) ? "fill-red-500" : ""}`}
+                                      />
+                                      <span className="ml-1 text-xs">{post.likedBy.length}</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Like</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => toggleComments(post.id)}
+                                      className="p-1"
+                                    >
+                                      <MessageSquare className="h-4 w-4" />
+                                      <span className="ml-1 text-xs">{(comments[post.id] || []).length}</span>
+                                      {showComments[post.id] ? (
+                                        <ChevronUp className="h-3 w-3 ml-1" />
+                                      ) : (
+                                        <ChevronDown className="h-3 w-3 ml-1" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Comments</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            {showComments[post.id] && (
+                              <div className="mt-3 border-t pt-3 transition-all duration-300">
+                                {post.allowComments && (
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Input
+                                      placeholder="Add a comment..."
+                                      value={commentInputs[post.id] || ""}
+                                      onChange={(e) =>
+                                        setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          handleAddComment(post.id);
+                                        }
+                                      }}
+                                      className="text-sm"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleAddComment(post.id)}
+                                      disabled={!commentInputs[post.id]?.trim()}
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                                <div className="space-y-3 max-h-[150px] overflow-y-auto">
+                                  {(comments[post.id] || []).length > 0 ? (
+                                    (comments[post.id] || []).map((comment) => (
+                                      <div key={comment.id} className="flex items-start gap-2">
+                                        <Avatar className="h-6 w-6">
+                                          <AvatarImage src={comment.author.avatar} />
+                                          <AvatarFallback>{comment.author.name.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <div className="flex items-center justify-between">
+                                            <p className="text-xs font-medium">{comment.author.name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                          </div>
+                                          {editingComment?.postId === post.id && editingComment?.commentId === comment.id ? (
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <Input
+                                                value={editingComment.content}
+                                                onChange={(e) =>
+                                                  setEditingComment({
+                                                    ...editingComment,
+                                                    content: e.target.value,
+                                                  })
+                                                }
+                                                onKeyDown={(e) => {
+                                                  if (e.key === "Enter") {
+                                                    handleEditComment(post.id, comment.id);
+                                                  }
+                                                }}
+                                                className="text-sm"
+                                              />
+                                              <Button
+                                                size="sm"
+                                                onClick={() => handleEditComment(post.id, comment.id)}
+                                                disabled={!editingComment.content.trim()}
+                                              >
+                                                Save
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setEditingComment(null)}
+                                              >
+                                                Cancel
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <p className="text-sm">{comment.content}</p>
+                                          )}
+                                          {isCommentOwner(comment) && !editingComment && (
+                                            <div className="flex gap-1 mt-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  setEditingComment({
+                                                    postId: post.id,
+                                                    commentId: comment.id,
+                                                    content: comment.content,
+                                                  })
+                                                }
+                                                className="p-1"
+                                              >
+                                                <Edit2 className="h-3 w-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDeleteComment(post.id, comment.id)}
+                                                className="p-1"
+                                              >
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No comments yet.</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </AnimatedTransition>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10">
+                    <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mt-4 text-lg font-medium">No liked content yet</h3>
+                    <p className="text-muted-foreground mt-2">Like posts and plans to see them here.</p>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </AnimatedTransition>

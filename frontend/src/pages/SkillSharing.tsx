@@ -49,18 +49,17 @@ const SkillSharing: React.FC = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
   const [editingComment, setEditingComment] = useState<{ postId: string; commentId: string; content: string } | null>(null);
-  const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({}); // Track visibility per post
+  const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/skill-posts`, { withCredentials: true });
         setPosts(response.data);
-        // Initialize comments and showComments state
         const initialShowComments: { [postId: string]: boolean } = {};
         for (const post of response.data) {
           fetchComments(post.id);
-          initialShowComments[post.id] = false; // Comments hidden by default
+          initialShowComments[post.id] = false;
         }
         setShowComments(initialShowComments);
       } catch (error) {
@@ -189,9 +188,13 @@ const SkillSharing: React.FC = () => {
       }));
       setEditingComment(null);
       toast.success("Comment updated!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating comment:", error);
-      toast.error("Failed to update comment. Please try again.");
+      if (error.response?.status === 403) {
+        toast.error("You are not authorized to edit this comment.");
+      } else {
+        toast.error("Failed to update comment. Please try again.");
+      }
     }
   };
 
@@ -204,9 +207,13 @@ const SkillSharing: React.FC = () => {
         [postId]: prev[postId].filter((c) => c.id !== commentId),
       }));
       toast.success("Comment deleted!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting comment:", error);
-      toast.error("Failed to delete comment. Please try again.");
+      if (error.response?.status === 403) {
+        toast.error("You are not authorized to delete this comment.");
+      } else {
+        toast.error("Failed to delete comment. Please try again.");
+      }
     }
   };
 
